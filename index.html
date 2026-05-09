@@ -4,24 +4,44 @@
     <meta charset="UTF-8">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; text-align: center; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
-        button { background: #0088cc; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; width: 100%; }
+        body { font-family: sans-serif; margin: 0; display: grid; grid-template-columns: 60px repeat(7, 1fr); background: #fff; }
+        .cell { border: 1px solid #eee; height: 50px; display: flex; align-items: center; justify-content: center; font-size: 10px; cursor: pointer; }
+        .time { background: #f7f7f7; font-weight: bold; cursor: default; }
+        .busy { background: #ccc !important; color: #666; font-weight: bold; } /* Не работает */
+        .selected { background: #ffcdd2; color: #b71c1c; font-weight: bold; } /* Выбор студента */
     </style>
 </head>
 <body>
-    <h3>Выберите время занятия</h3>
-    <input type="datetime-local" id="timeInput">
-    <button onclick="send()">Записаться</button>
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+    const p = new URLSearchParams(window.location.search);
+    const role = p.get('role');
+    const busyArr = (p.get('busy') || "").split(',');
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        function send() {
-            const val = document.getElementById('timeInput').value;
-            if (!val) return alert("Выберите время!");
-            tg.sendData(val); // Отправляем строку с датой обратно в бот
-            tg.close();
+    for (let h = 9; h <= 18; h++) {
+        document.body.innerHTML += `<div class="cell time">${h}:00</div>`;
+        for (let d = 0; d < 7; d++) {
+            let isBusy = busyArr.includes(h.toString());
+            let cls = isBusy ? 'cell busy' : 'cell';
+            let txt = isBusy ? 'Не работает' : '';
+            document.body.innerHTML += `<div id="c${d}${h}" class="${cls}" onclick="tap(${d},${h})">${txt}</div>`;
         }
-    </script>
+    }
+
+    function tap(d, h) {
+        let el = document.getElementById(`c${d}${h}`);
+        if (role === 'tutor') {
+            let nowBusy = !el.classList.contains('busy');
+            el.className = nowBusy ? 'cell busy' : 'cell';
+            el.innerText = nowBusy ? 'Не работает' : '';
+            tg.sendData(`EDIT:${h}:${nowBusy ? 'busy' : 'free'}`);
+        } else if (!el.classList.contains('busy')) {
+            el.className = 'cell selected';
+            el.innerText = 'Занято';
+            tg.sendData(`BOOK:${h}:occupied`);
+        }
+    }
+</script>
 </body>
 </html>
