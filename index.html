@@ -2,92 +2,88 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Schedule App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; padding: 0; background-color: #fff; }
-        .header-row {
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; user-select: none; }
+        .header {
             display: grid;
-            grid-template-columns: 60px repeat(7, 1fr);
-            background: #f0f0f0;
-            border-bottom: 2px solid #28a745;
+            grid-template-columns: 50px repeat(7, 1fr);
+            background: #fff;
+            border-top: 5px solid #28a745;
             position: sticky; top: 0; z-index: 10;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
-        .header-cell {
-            padding: 10px 5px; text-align: center; font-size: 12px;
-            border-right: 1px solid #ddd;
-        }
-        .schedule-grid {
-            display: grid;
-            grid-template-columns: 60px repeat(7, 1fr);
-            grid-auto-rows: 50px;
-        }
-        .time-cell {
-            border-bottom: 1px solid #eee; border-right: 1px solid #ddd;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 11px; color: #666;
-        }
-        .slot {
-            border-bottom: 1px solid #eee; border-right: 1px solid #ddd;
-            font-size: 10px; padding: 4px; overflow: hidden; cursor: pointer;
-        }
-        /* Цвета как на скрине */
-        .status-busy { background-color: #c4c4c4; color: #333; } /* Не работает */
-        .status-free { background-color: #fff; } /* Свободно */
-        .status-occupied { background-color: #d1e7dd; border-left: 3px solid #198754; } /* Записан ученик */
+        .header-cell { padding: 8px 2px; text-align: center; font-size: 10px; border-right: 1px solid #eee; }
+        .grid { display: grid; grid-template-columns: 50px repeat(7, 1fr); grid-auto-rows: 60px; }
+        .time-label { font-size: 11px; color: #888; text-align: center; padding-top: 5px; border-bottom: 1px solid #f9f9f9; }
         
-        .slot-info { font-weight: bold; margin-bottom: 2px; }
+        .slot { border-right: 1px solid #eee; border-bottom: 1px solid #eee; padding: 4px; font-size: 9px; cursor: pointer; }
+        
+        /* Цвета согласно ТЗ и скриншоту */
+        .free { background: #fff; } 
+        .busy { background: #d3d3d3; color: #555; } /* Серый - Репетитор отдыхает */
+        .occupied { background: #ffcdd2; border-left: 3px solid #d32f2f; color: #b71c1c; } /* Красный - Занято другим */
+        .my-booking { background: #e8f5e9; border-left: 3px solid #28a745; } /* Зеленый - Твоя запись */
     </style>
 </head>
 <body>
-    <!-- Шапка с датами (как на image_773209.png) -->
-    <div class="header-row">
-        <div class="header-cell">Время</div>
-        <div class="header-cell">пн, 04.05<br><b>Кошевник Е.</b></div>
-        <div class="header-cell">вт, 05.05<br><b>Кошевник Е.</b></div>
-        <div class="header-cell">ср, 06.05<br><b>Кошевник Е.</b></div>
-        <div class="header-cell">чт, 07.05<br><b>Кошевник Е.</b></div>
-        <div class="header-cell">пт, 08.05<br><b>Кошевник Е.</b></div>
-        <div class="header-cell">сб, 09.05<br><b>Кошевник Е.</b></div>
-        <div class="header-cell">вс, 10.05<br><b>Кошевник Е.</b></div>
+    <div class="header" id="header-days">
+        <div class="header-cell"></div>
     </div>
-
-    <div class="schedule-grid" id="grid">
-        <!-- Сетка будет заполняться JavaScript -->
-    </div>
+    <div class="grid" id="main-grid"></div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Развернуть на весь экран
+        tg.expand();
 
-        const grid = document.getElementById('grid');
-        const days = 7;
-        const startHour = 8;
-        const endHour = 20;
+        // Получаем параметры из URL (роль и ID)
+        const params = new URLSearchParams(window.location.search);
+        const userRole = params.get('role') || 'student';
+        const tutorId = params.get('tutor_id');
 
-        for (let h = startHour; h <= endHour; h++) {
-            // Колонка времени
-            const timeDiv = document.createElement('div');
-            timeDiv.className = 'time-cell';
-            timeDiv.innerText = h + ':00';
-            grid.appendChild(timeDiv);
+        const days = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+        const dates = ['04.05', '05.05', '06.05', '07.05', '08.05', '09.05', '10.05'];
 
-            // Слоты для каждого дня
-            for (let d = 0; d < days; d++) {
+        // Отрисовка шапки
+        const header = document.getElementById('header-days');
+        days.forEach((day, i) => {
+            const div = document.createElement('div');
+            div.className = 'header-cell';
+            div.innerHTML = `<b>${day}</b><br>${dates[i]}`;
+            header.appendChild(div);
+        });
+
+        // Отрисовка сетки
+        const grid = document.getElementById('main-grid');
+        for (let h = 8; h <= 20; h++) {
+            const time = document.createElement('div');
+            time.className = 'time-label';
+            time.innerText = `${h}:00`;
+            grid.appendChild(time);
+
+            for (let d = 0; d < 7; d++) {
                 const slot = document.createElement('div');
-                slot.className = 'slot status-free';
+                slot.className = 'slot free';
                 
-                // Пример заполнения как на скриншоте для Пн 9:00
-                if (d === 0 && h === 9) {
-                    slot.className = 'slot status-busy';
-                    slot.innerHTML = '<div class="slot-info">09:00-15:00</div>Не работает';
-                }
+                // Пример данных (в реальном проекте они будут грузиться из БД)
+                if (h < 10) slot.classList.add('busy'); 
 
                 slot.onclick = () => {
-                    const data = `День: ${d}, Время: ${h}:00`;
-                    tg.sendData(data); // Отправка данных боту
-                    tg.close();
+                    if (userRole === 'tutor') {
+                        // Логика репетитора: переключение Свободно/Выходной
+                        slot.classList.toggle('busy');
+                        const status = slot.classList.contains('busy') ? 'busy' : 'free';
+                        tg.sendData(`EDIT:${d}:${h}:${status}`);
+                    } else {
+                        // Логика студента: запись
+                        if (slot.classList.contains('free')) {
+                            slot.className = 'slot my-booking';
+                            slot.innerHTML = '<b>Записано</b>';
+                            tg.sendData(`BOOK:${d}:${h}`);
+                        } else {
+                            tg.showAlert("Это время занято или недоступно!");
+                        }
+                    }
                 };
                 grid.appendChild(slot);
             }
