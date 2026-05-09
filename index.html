@@ -5,14 +5,14 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { font-family: sans-serif; margin: 0; background: #fff; }
-        .header { display: grid; grid-template-columns: 50px repeat(7, 1fr); border-top: 4px solid #28a745; position: sticky; top: 0; background: white; z-index: 5; }
+        .header { display: grid; grid-template-columns: 50px repeat(7, 1fr); border-top: 4px solid #28a745; position: sticky; top: 0; background: white; z-index: 10; }
         .header-cell { padding: 5px; text-align: center; font-size: 10px; border-right: 1px solid #eee; }
         .grid { display: grid; grid-template-columns: 50px repeat(7, 1fr); grid-auto-rows: 60px; }
         .time { font-size: 10px; color: #999; text-align: center; border-bottom: 1px solid #f9f9f9; padding-top: 5px; }
-        .slot { border-right: 1px solid #eee; border-bottom: 1px solid #eee; padding: 4px; font-size: 10px; cursor: pointer; transition: 0.2s; }
+        .slot { border-right: 1px solid #eee; border-bottom: 1px solid #eee; padding: 4px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; text-align: center; }
         .free { background: #fff; }
-        .busy { background: #e0e0e0; color: #555; font-weight: bold; text-align: center; display: flex; align-items: center; justify-content: center; } 
-        .occupied { background: #ffebee; color: #c62828; text-align: center; font-weight: bold; }
+        .busy { background: #e0e0e0; color: #555; font-weight: bold; } /* Серый - Не работает */
+        .occupied { background: #ffebee; color: #c62828; font-weight: bold; } /* Красный - Занято */
     </style>
 </head>
 <body>
@@ -26,13 +26,12 @@
 
         const params = new URLSearchParams(window.location.search);
         const role = params.get('role');
+        const busyHours = (params.get('busy') || "").split(',');
 
-        // Рисуем дни недели
         const days = ['пн','вт','ср','чт','пт','сб','вс'];
         const hDiv = document.getElementById('h');
         hDiv.innerHTML = '<div class="header-cell"></div>' + days.map(d => `<div class="header-cell"><b>${d}</b></div>`).join('');
 
-        // Рисуем сетку часов
         const gDiv = document.getElementById('g');
         for (let hr = 9; hr <= 19; hr++) {
             const t = document.createElement('div');
@@ -42,22 +41,24 @@
             for (let d = 0; d < 7; d++) {
                 const s = document.createElement('div');
                 s.className = 'slot free';
-                s.id = `slot-${d}-${hr}`; // Уникальный ID для каждого слота
                 
+                // Проверяем, был ли этот час отмечен как занятый
+                if (busyHours.includes(hr.toString())) {
+                    s.className = 'slot busy';
+                    s.innerHTML = 'Не работает';
+                }
+
                 s.onclick = () => {
                     if (role === 'tutor') {
                         if (s.classList.contains('busy')) {
-                            s.className = 'slot free';
-                            s.innerHTML = '';
+                            s.className = 'slot free'; s.innerHTML = '';
                             tg.sendData(`EDIT:${d}:${hr}:free`);
                         } else {
-                            s.className = 'slot busy';
-                            s.innerHTML = 'Не работает';
+                            s.className = 'slot busy'; s.innerHTML = 'Не работает';
                             tg.sendData(`EDIT:${d}:${hr}:busy`);
                         }
                     } else if (s.classList.contains('free')) {
-                        s.className = 'slot occupied';
-                        s.innerHTML = 'Занято';
+                        s.className = 'slot occupied'; s.innerHTML = 'Занято';
                         tg.sendData(`BOOK:${d}:${hr}:occupied`);
                     }
                 };
