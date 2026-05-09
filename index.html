@@ -47,47 +47,66 @@
         let tg = window.Telegram.WebApp;
         tg.expand();
 
-        // 1. Получаем данные из URL, которые прислал Python
         const urlParams = new URLSearchParams(window.location.search);
         const rawData = urlParams.get('data');
+        const role = urlParams.get('role'); // Получаем роль: tutor или student
         const schedule = JSON.parse(decodeURIComponent(rawData));
 
         const container = document.getElementById('calendar');
         const hours = ["09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00", "17:00", "18:00", "19:00", "20:00"];
         const days = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
 
-        // 2. Отрисовываем сетку
         hours.forEach(hour => {
-            // Добавляем время в первый столбец
             let timeCell = document.createElement('div');
             timeCell.className = 'cell time-label';
             timeCell.innerText = hour;
             container.appendChild(timeCell);
 
-            // Добавляем ячейки для каждого дня
             days.forEach(day => {
                 let cell = document.createElement('div');
                 cell.className = 'cell';
                 
-                // Ищем, есть ли в базе запись на это время
                 let slot = schedule.find(s => s.day === day && s.time.startsWith(hour));
                 
                 if (slot) {
+                    // Отрисовка статусов
                     if (slot.status === 'Не работает') {
                         cell.classList.add('not-working');
                         cell.innerText = "Не работает";
                     } else if (slot.status === 'Занято') {
                         cell.classList.add('busy');
-                        cell.innerHTML = `<span>Занято</span>`;
-                        // Если захочешь видеть имена в админке, можно добавить условие
+                        // Репетитор видит имя студента, если оно есть
+                        let label = (role === 'tutor' && slot.name) ? slot.name : "Занято";
+                        cell.innerHTML = `<span>${label}</span>`;
                     } else if (slot.status === 'Свободно') {
                         cell.classList.add('free');
                         cell.innerText = "Свободно";
-                        cell.onclick = () => {
-                            tg.sendData(JSON.stringify({action: 'book', id: slot.id, time: `${day} ${hour}`}));
-                            tg.close();
-                        };
                     }
+
+                    // ЛОГИКА КЛИКА
+                    cell.onclick = () => {
+                        if (role === 'tutor') {
+                            // Меню для репетитора (упрощенное)
+                            const newStatus = confirm(`Изменить статус ${day} ${hour}?\nOK — Сделать СВОБОДНЫМ\nОтмена — НЕ РАБОТАЮ`);
+                            const actionType = newStatus ? 'free' : 'not_working';
+                            
+                            tg.sendData(JSON.stringify({
+                                action: 'update_status', 
+                                id: slot.id, 
+                                status: actionType,
+                                time: `${day} ${hour}`
+                            }));
+                            tg.close();
+                        } else if (role === 'student' && slot.status === 'Свободно') {
+                            // Обычная запись для студента
+                            tg.sendData(JSON.stringify({
+                                action: 'book', 
+                                id: slot.id, 
+                                time: `${day} ${hour}`
+                            }));
+                            tg.close();
+                        }
+                    };
                 }
                 container.appendChild(cell);
             });
